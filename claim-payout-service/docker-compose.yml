@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  aws-localstack:
+    container_name: aws-localstack
+    image: localstack/localstack:2.3.2
+    ports:
+      - "127.0.0.1:4510-4559:4510-4559"
+      - "127.0.0.1:4566:4566"
+      - "127.0.0.1:5678:5678"
+    restart: always
+    networks:
+      - mongodb_network
+    environment:
+      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
+      - DEBUG=1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_DEFAULT_REGION=eu-west-1
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - EDGE_PORT=4566
+      - SERVICES=lambda,s3,serverless,cloudformation,sts,apigateway,iam,route53,stepfunctions
+      - DATA_DIR=${DATA_DIR-}
+      - LAMBDA_EXECUTOR=${LAMBDA_EXECUTOR-docker}
+      - HOST_TMP_FOLDER=${TMPDIR:-/tmp/}localstack
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DISABLE_CORS_CHECKS=1
+      - LAMBDA_REMOTE_DOCKER=false
+      - PROVIDER_OVERRIDE_STEPFUNCTIONS=v2
+    volumes:
+      - "${TMPDIR:-/tmp/localstack}:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    links:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    hostname: mongodb
+    volumes:
+      - ./mongodb/initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - mongodb-data:/data/db/
+      - mongodb-log:/var/log/mongodb/
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    ports:
+      - "27017:27017"
+    networks:
+      - mongodb_network
+    expose:
+      - 27017
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_SERVER: "mongodb"
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+    ports:
+      - 8081:8081
+    networks:
+      - mongodb_network
+    depends_on:
+      - mongodb
+
+volumes:
+  mongodb-data:
+    driver: local
+    name: mongo-data
+  mongodb-log:
+    driver: local
+    name: mongo-log
+
+networks:
+  mongodb_network:
+    driver: bridge
+    name: mongo-network
