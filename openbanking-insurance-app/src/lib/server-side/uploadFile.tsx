@@ -8,11 +8,11 @@ async function uploadFileToUrl(file: any, key: string) {
     const url = process.env.S3_URL;
 
     const formData = new FormData();
-    formData.append('key', '354550316.jpg');
+    formData.append('key', key);
     formData.append('file', file);
 
     if (url) {
-      const uploadResponse = await fetch(url, {
+      await fetch(url, {
         method: 'POST',
         body: formData,
       });
